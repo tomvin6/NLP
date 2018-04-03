@@ -22,7 +22,7 @@ def descriptive_statistics():
     # count train file
     for line in train_lines:
         uni_count += 1
-        if len(line.strip()) > 0 and not line.startswith("#"):
+        if len(line.strip('\n')) > 0 and not line.startswith("#"):
             tokens = re.split(r'\t+', line)
             segment_words.add(tokens[0])
             segment_tags.add(tokens[1])
@@ -36,7 +36,7 @@ def descriptive_statistics():
     # count gold file
     for line in gold_lines:
         uni_count += 1
-        if len(line.strip()) > 0 and not line.startswith("#"):
+        if len(line.strip('\n')) > 0 and not line.startswith("#"):
             tokens = re.split(r'\t+', line)
             segment_words.add(tokens[0])
             segment_tags.add(tokens[1])
