@@ -11,6 +11,7 @@ smoothing = sys.argv[4]
 gold_file = open('exps' + os.sep + fileName)
 train_file = open('exps' + os.sep + 'heb-pos.train')
 
+
 def count_words():
     uni_count = 0
     segment_words = set()
@@ -34,4 +35,6 @@ def count_words():
     print "word type count = " + str(len(segment_words))
     print "word count = " + str(uni_count)
     print "tag count = " + str(len(segment_tags))
+
+
 count_words()
