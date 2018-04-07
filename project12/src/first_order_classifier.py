@@ -75,6 +75,7 @@ def build_n_gram_counters_map(train_file_path, n_grams):
             continue
         else:
             sentence = get_next_sentence(i, train_list)
+            i += len(sentence)
             sentence.insert(0, ('<s>', '<s>'))
             sentence.append(('<e>', '<e>'))
             for j in range(len(sentence) - n_grams + 1):
@@ -83,7 +84,6 @@ def build_n_gram_counters_map(train_file_path, n_grams):
                     n_gram_tag_counters[key] += 1
                 else:
                     n_gram_tag_counters[key] = 1
-            i += len(sentence)
     return n_gram_tag_counters
 
 
