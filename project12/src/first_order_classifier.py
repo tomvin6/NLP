@@ -67,6 +67,7 @@ def get_next_sentence(start_index, train_list):
 def build_n_gram_counters_map(train_file_path, n_grams):
     n_gram_tag_counters = dict()
     train_list = load_key_value_file_as_list(train_file_path)
+    # TODO: pad with <s> , </s> before and after each sentence
     i = 0
     while i < len(train_list) - n_grams + 1:
         if end_of_sentence(train_list[i]):
@@ -74,6 +75,8 @@ def build_n_gram_counters_map(train_file_path, n_grams):
             continue
         else:
             sentence = get_next_sentence(i, train_list)
+            sentence.insert(0, ('<s>', '<s>'))
+            sentence.append(('<e>', '<e>'))
             for j in range(len(sentence) - n_grams + 1):
                 key = get_gram_key(sentence, j, n_grams)
                 if n_gram_tag_counters.has_key(key):
@@ -127,6 +130,8 @@ def train_first_order_classifier(train_file_path, lexical_file_path, structural_
         ngram_counters.append(build_n_gram_counters_map(train_file_path, i))
     all_prob_map = build_probability_map(ngram_counters)
     write_results_on_structural_file(structural_file_path, all_prob_map)
+
+# def decode(lex_params_path, struc_param_path):
 
 
 # run all phases one after another
