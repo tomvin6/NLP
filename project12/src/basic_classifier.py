@@ -1,5 +1,4 @@
 import sys
-import re  # for splitting by tabs
 import os  # for file separator (in linux & windows)
 import json  # for writing the parameter file
 from utils import *
@@ -18,18 +17,6 @@ classification_output_file_path = 'classifications.tagged'  # decode phase outpu
 evaluate_file_path = 'evaluation.eval'  # evaluate phase output
 
 
-def update_words_tag_model(words_tag_dict, word_segment, word_tag):
-    # calc average tags per word
-    if words_tag_dict.has_key(word_segment):
-        if words_tag_dict[word_segment].has_key(word_tag):
-            words_tag_dict[word_segment][word_tag] += 1
-        else:
-            words_tag_dict[word_segment][word_tag] = 1  # init tag counter
-    else:
-        words_tag_dict[word_segment] = dict()
-        words_tag_dict[word_segment][word_tag] = 1  # init tag counter
-
-
 # this method implements majority classifier
 def get_majority_tag(tags_map):
     max_tag_counter = 0
@@ -42,20 +29,8 @@ def get_majority_tag(tags_map):
 
 
 def train_phase(train_file_path, param_file_path_output):
-    uni_count = 0
-    words_tag_model_tmp_data = dict()
     words_tag_model_output = dict()
-    # read data from train file
-    with open(train_file_path, "r") as train_file:
-        train_lines = train_file.readlines()
-    # build word-tag model
-    for line in train_lines:
-        if is_comment_line(line):
-            continue
-        uni_count += 1
-        if is_line_legal(line):
-            tokens = re.split(r'\t+', line)
-            update_words_tag_model(words_tag_model_tmp_data, tokens[0].strip('\n'), tokens[1].strip('\n'))
+    words_tag_model_tmp_data = build_segment_tags_map(train_file_path)
     # filter only majority tag for each word segment
     for (segment, tags_map) in words_tag_model_tmp_data.items():
         words_tag_model_output[segment] = get_majority_tag(tags_map)
@@ -107,15 +82,16 @@ def sentence_accuracy_for_sentence(sentence_matches, sentence_length):
     return 0
 
 
-def print_evaluate_file(sentences_accuracy_list, matches, all_data):
-    print "evaluations for basic analyzer:"
-    print "     matches " + str(matches) + " all data " + str(all_data)
-    print "     sentence accuracy for test corpus " + str(sentence_accuracy_for_test_corpus(sentences_accuracy_list))
+# this method takes a sentence details and update output list with new values
+def update_accuracy_list(sentences_accuracy_list, sentence_index, last_sentence_matches, last_sentence_length):
+    word_acc = word_accuracy_for_sentence(last_sentence_matches, last_sentence_length)
+    sent_acc = sentence_accuracy_for_sentence(last_sentence_matches, last_sentence_length)
+    sentences_accuracy_list.append((sentence_index, word_acc, sent_acc))
 
 
 def evaluate(classification_output_path, gold_path, evaluate_file_path):
     sentences_accuracy_list = []
-    sentence_index = 1
+    sentence_index = 0
     last_sentence_length = 0
     last_sentence_matches = 0
     matches = 0
@@ -126,12 +102,9 @@ def evaluate(classification_output_path, gold_path, evaluate_file_path):
     for index, elem in enumerate(gold_file_items):
         prediction_item = classifications_file_items[index]
         classification_item = gold_file_items[index]
-        if end_of_sentence(classification_item):
-            word_acc = word_accuracy_for_sentence(last_sentence_matches, last_sentence_length)
-            sent_acc = sentence_accuracy_for_sentence(last_sentence_matches, last_sentence_length)
-            sentences_accuracy_list.append((sentence_index, word_acc, sent_acc))
-            if last_sentence_length > 0:  # if we had words in sentence and it's not just multiple EOL characters
-                sentence_index += 1
+        if end_of_sentence(classification_item) and last_sentence_length > 0:
+            sentence_index += 1
+            update_accuracy_list(sentences_accuracy_list, sentence_index, last_sentence_matches, last_sentence_length)
             last_sentence_length = 0
             last_sentence_matches = 0
         else:  # segment with tag, compare tags
@@ -144,6 +117,10 @@ def evaluate(classification_output_path, gold_path, evaluate_file_path):
                 errors += 1
             all_data += 1
             last_sentence_length += 1
+    # last sentence can finish without EOL character
+    if last_sentence_length > 0:
+        update_accuracy_list(sentences_accuracy_list, sentence_index, last_sentence_matches, last_sentence_length)
+    # write results to file
     with open(evaluate_file_path, "w") as eval_file:
         print_title_to_file(eval_file, "Part-of-speech Tagging Evaluation")
         print_eval_details(eval_file, model, smoothing, test_file_path, gold_file_path)

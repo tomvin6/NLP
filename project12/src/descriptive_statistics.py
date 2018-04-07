@@ -2,7 +2,7 @@ import sys
 import re  # for splitting by tabs
 import os  # for file separator (in linux & windows)
 
-from utils import is_line_legal, is_comment_line
+from utils import *
 
 tagged = sys.argv[1]  # 1 - majority, 2 - bi-gram
 fileName = sys.argv[2]  # 1 - majority, 2 - bi-gram
@@ -17,7 +17,7 @@ train_file = open('..' + os.sep + 'exps' + os.sep + 'heb-pos.train')
 def count_file(file_lines, words_tag_dict, segments_set, tags_set, prev_counter):
     counter = prev_counter
     for line in file_lines:
-        if is_comment_line(line):
+        if is_comment_line(line) or end_of_sentence(line):
             continue
         if is_line_legal(line):
             counter += 1
