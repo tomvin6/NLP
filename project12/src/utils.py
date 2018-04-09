@@ -65,6 +65,11 @@ def split_tags(elem):
     return elem.split(":")
 
 
+def decode_key_tags(lex_line):
+    cells = lex_line.split("\t")
+    return ', '.join(cells[1:]), cells[:1]
+
+
 def write_ngrams_probability_section(output_file, ngrams_data):
     for index, elem in enumerate(ngrams_data):
         output_file.write("\\" + str(index + 1) + "-grams\\ \n")

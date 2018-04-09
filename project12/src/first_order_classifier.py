@@ -14,7 +14,7 @@ smoothing = sys.argv[4]
 # file paths
 lexical_file_path = 'lexical-model.txt'  # train phase output
 structural_file_path = 'train-param-file2.txt'  # train phase output
-train_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos2.train'
+train_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos.train'
 
 test_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos.test'
 gold_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos.gold'
@@ -134,6 +134,22 @@ def train_first_order_classifier(train_file_path, lexical_file_path, structural_
     all_prob_map = build_probability_map(ngram_counters)
     write_results_on_structural_file(structural_file_path, all_prob_map)
 
+
+def is_bigram_line(line):
+    return len(line.split('\t')) == 3
+
+
+def load_lex_params(lexical_file_path):
+    lex_probs = dict()
+    with open(lexical_file_path, 'r') as input:
+        lex_lines = input.readlines()
+        for line in lex_lines:
+            if is_bigram_line(line):
+                (tags_key, tags_prob) = decode_key_tags(line)
+                lex_probs[tags_key] = tags_prob
+    return lex_probs
+
+
 def decode_sentence(sentence, all_possible_tags):
     lex_map = load_lex_params()
     struct_map = load_struc_params()
@@ -147,3 +163,4 @@ def decode_sentence(sentence, all_possible_tags):
 
 # run all phases one after another
 train_first_order_classifier(train_file_path, lexical_file_path, structural_file_path, 3)
+load_lex_file(lexical_file_path)
