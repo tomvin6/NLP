@@ -13,7 +13,7 @@ smoothing = sys.argv[4]
 
 # file paths
 lexical_file_path = 'lexical-model.txt'  # train phase output
-structural_file_path = 'train-param-file2.txt'  # train phase output
+structural_file_path = 'structural-model.txt'  # train phase output
 train_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos.train'
 
 test_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos.test'
@@ -108,7 +108,7 @@ def update_key_probability(prob_map, gram_counters, gram_size, gram_key):
         ith_gram_counter = ith_gram_counters_map[gram_key]
         prev_ith_gram_counter = prev_ith_gram_counters_map[':'.join(key_array[:-1])]
         # add prob:
-        prob_map[gram_key] = 1.0 * ith_gram_counter / prev_ith_gram_counter
+        prob_map[gram_key] = round(math.log((1.0 * ith_gram_counter / prev_ith_gram_counter)))
 
 
 def build_probability_map(gram_counters):
@@ -144,23 +144,32 @@ def load_lex_params(lexical_file_path):
     with open(lexical_file_path, 'r') as input:
         lex_lines = input.readlines()
         for line in lex_lines:
-            if is_bigram_line(line):
-                (tags_key, tags_prob) = decode_key_tags(line)
-                lex_probs[tags_key] = tags_prob
+                update_struct_map(line, lex_probs)
     return lex_probs
 
 
+def load_struc_params(structural_file_path):
+    struct_probs = dict()
+    with open(structural_file_path, 'r') as input:
+        lex_lines = input.readlines()
+        for line in lex_lines:
+            if is_bigram_line(line):
+                (tags_key, tags_prob) = decode_key_tags(line)
+                struct_probs[tags_key] = tags_prob
+    return struct_probs
+
+
 def decode_sentence(sentence, all_possible_tags):
-    lex_map = load_lex_params()
-    struct_map = load_struc_params()
     s_words = len(sentence)
-    states = len(all_possible_tags)
-    viterbi_prob_matrix = np.zeros(s_words, states)
-    viterbi_path_matrix = np.zeros(s_words, states)
-    sentence_tags = np.zeros(s_words)
-    # initialize viterbi values
-    viterbi_prob_matrix[:,0] = get_prob(s, s0, w, lex_map, struct_map)
+    # states = len(all_possible_tags)
+    # viterbi_prob_matrix = np.zeros(s_words, states)
+    # viterbi_path_matrix = np.zeros(s_words, states)
+    # sentence_tags = np.zeros(s_words)
+    # # initialize viterbi values
+    # viterbi_prob_matrix[:,0] = get_prob(s, s0, w, lex_map, struct_map)
+
 
 # run all phases one after another
-train_first_order_classifier(train_file_path, lexical_file_path, structural_file_path, 3)
-load_lex_file(lexical_file_path)
+#train_first_order_classifier(train_file_path, lexical_file_path, structural_file_path, 3)
+struct_map = load_struc_params(structural_file_path)
+lex_map = load_lex_params(lexical_file_path)

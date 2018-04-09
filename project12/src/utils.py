@@ -1,4 +1,5 @@
 import re  # for splitting by tabs
+from itertools import izip
 
 # optional parameter
 MISSING = object()
@@ -68,6 +69,16 @@ def split_tags(elem):
 def decode_key_tags(lex_line):
     cells = lex_line.split("\t")
     return ', '.join(cells[1:]), cells[:1]
+
+
+def update_struct_map(lex_line, segment_map):
+    cells = lex_line.split("\t")
+    pair_iter = iter(cells[1:])
+    for tag, prob in izip(pair_iter, pair_iter):
+        if not segment_map.has_key(cells[0]):
+            segment_map[cells[0]] = dict()
+        segment_map[cells[0]][tag] = prob
+    return segment_map
 
 
 def write_ngrams_probability_section(output_file, ngrams_data):
