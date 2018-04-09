@@ -1,6 +1,9 @@
 import sys
 import os  # for file separator (in linux & windows)
 import math
+
+import numpy as np
+
 from utils import *
 
 tagged = sys.argv[1]  # 1 - majority, 2 - bi-gram
@@ -131,8 +134,16 @@ def train_first_order_classifier(train_file_path, lexical_file_path, structural_
     all_prob_map = build_probability_map(ngram_counters)
     write_results_on_structural_file(structural_file_path, all_prob_map)
 
-# def decode(lex_params_path, struc_param_path):
-
+def decode_sentence(sentence, all_possible_tags):
+    lex_map = load_lex_params()
+    struct_map = load_struc_params()
+    s_words = len(sentence)
+    states = len(all_possible_tags)
+    viterbi_prob_matrix = np.zeros(s_words, states)
+    viterbi_path_matrix = np.zeros(s_words, states)
+    sentence_tags = np.zeros(s_words)
+    # initialize viterbi values
+    viterbi_prob_matrix[:,0] = get_prob(s, s0, w, lex_map, struct_map)
 
 # run all phases one after another
 train_first_order_classifier(train_file_path, lexical_file_path, structural_file_path, 3)
