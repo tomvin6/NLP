@@ -1,8 +1,10 @@
 import re  # for splitting by tabs
 from itertools import izip
 
-# optional parameter
+# constants
 MISSING = object()
+START_TAG = "<s>"
+END_TAG = "<e>"
 
 
 def is_line_legal(line):
@@ -38,8 +40,8 @@ def print_title_to_file(file_to_print, title):
 
 def print_eval_details(file_to_print, model, smoothing, test_file, gold_file):
     file_to_print.write("#\n")
-    file_to_print.write("# Model: " + model + "\n")
-    file_to_print.write("# Smoothing: " + smoothing + "\n")
+    file_to_print.write("# Model: " + str(model) + "\n")
+    file_to_print.write("# Smoothing: " + str(smoothing) + "\n")
     file_to_print.write("# Test File: " + test_file + "\n")
     file_to_print.write("# Gold File: " + gold_file + "\n")
     file_to_print.write("#\n")
@@ -67,8 +69,12 @@ def split_tags(elem):
 
 
 def decode_key_tags(lex_line):
-    cells = lex_line.split("\t")
-    return ', '.join(cells[1:]), cells[:1]
+    cells = lex_line.strip().split("\t")
+    return get_strc_key(cells[1:]).strip(), cells[:1]
+
+
+def get_strc_key(tags):
+    return ', '.join(tags)
 
 
 def update_struct_map(lex_line, segment_map):
@@ -77,7 +83,7 @@ def update_struct_map(lex_line, segment_map):
     for tag, prob in izip(pair_iter, pair_iter):
         if not segment_map.has_key(cells[0]):
             segment_map[cells[0]] = dict()
-        segment_map[cells[0]][tag] = prob
+        segment_map[cells[0]][tag] = prob.strip()
     return segment_map
 
 
@@ -133,3 +139,97 @@ def build_segment_tags_map(train_file_path, tags_map=MISSING):
             if not tags_map == MISSING:
                 update_key_counter(tags_map, segment_tag)
     return words_tag_model_tmp_data
+
+
+def append_sentence_to_classification_file(classification_file, sentence_words, sentence_class):
+        for i, word in enumerate(sentence_words):
+            classification_file.write(sentence_words[i].strip() + '\t' + sentence_class[i].strip() + '\n')
+
+
+def word_accuracy_for_sentence(sentence_matches, sentence_length):
+    return 1.0 * sentence_matches / sentence_length
+
+
+def sentence_accuracy_for_sentence(sentence_matches, sentence_length):
+    if word_accuracy_for_sentence(sentence_matches, sentence_length) >= 1.0:
+        return 1
+    return 0
+
+
+def classify_phase(get_trained_model, parameters, test_path, classification_path, classifier):
+    classifications = []
+    # get trained model from parameters file
+    trained_model = get_trained_model(parameters)
+    # get test file data
+    with open(test_path, "r") as test_data:
+        test_lines = test_data.readlines()
+    for line in test_lines:
+        if is_comment_line(line):
+            continue
+        if not end_of_sentence(line):
+            segment = line.strip('\n')
+            classifications.append((segment, classifier(segment, trained_model)))
+        else:
+            classifications.append(line)  # for saving the spaces between sentences in classification file
+    # write classifications to file
+    with open(classification_path, "w") as classification_file:
+        for item in classifications:
+            if is_comment_line(line):
+                continue
+            if not end_of_sentence(item):
+                (segment, classification) = item
+                classification_file.write(segment + '\t' + classification + '\n')
+            else:
+                classification_file.write(item)
+
+
+# this method takes a sentence details and update output list with new values
+def update_accuracy_list(sentences_accuracy_list, sentence_index, last_sentence_matches, last_sentence_length):
+    word_acc = word_accuracy_for_sentence(last_sentence_matches, last_sentence_length)
+    sent_acc = sentence_accuracy_for_sentence(last_sentence_matches, last_sentence_length)
+    sentences_accuracy_list.append((sentence_index, word_acc, sent_acc))
+
+
+def sentence_accuracy_for_test_corpus(sentences_accuracy_list):
+    perfect_sentences = len(filter(lambda ((sentence_index, word_acc, sent_acc)): sent_acc == 1, sentences_accuracy_list))
+    return 1.0 * perfect_sentences / len(sentences_accuracy_list)
+
+
+def evaluate(classification_output_path, gold_path, evaluate_file_path, test_file_path, model, smoothing):
+    sentences_accuracy_list = []
+    sentence_index = 0
+    last_sentence_length = 0
+    last_sentence_matches = 0
+    matches = 0
+    errors = 0
+    all_data = 0
+    classifications_file_items = load_key_value_file_as_list(classification_output_path)
+    gold_file_items = load_key_value_file_as_list(gold_path)
+    for index, elem in enumerate(gold_file_items):
+        classification_item = gold_file_items[index]
+        if end_of_sentence(classification_item) and last_sentence_length > 0:
+            sentence_index += 1
+            update_accuracy_list(sentences_accuracy_list, sentence_index, last_sentence_matches, last_sentence_length)
+            last_sentence_length = 0
+            last_sentence_matches = 0
+        else:  # segment with tag, compare tags
+            prediction_item = classifications_file_items[index]
+            (class_segment, prediction) = prediction_item
+            (gold_segment, real_tag) = classification_item
+            if prediction == real_tag:
+                matches += 1
+                last_sentence_matches += 1
+            else:
+                errors += 1
+            all_data += 1
+            last_sentence_length += 1
+    # last sentence can finish without EOL character
+    if last_sentence_length > 0:
+        update_accuracy_list(sentences_accuracy_list, sentence_index, last_sentence_matches, last_sentence_length)
+    # write results to file
+    with open(evaluate_file_path, "w") as eval_file:
+        print_title_to_file(eval_file, "Part-of-speech Tagging Evaluation")
+        print_eval_details(eval_file, model, smoothing, test_file_path, gold_path)
+        print_title_to_file(eval_file, "sent-num word-accuracy sent-accuracy")
+        print_sentence_data(eval_file, sentences_accuracy_list)
+        print_macro_avg(eval_file, 1.0 * matches / all_data, sentence_accuracy_for_test_corpus(sentences_accuracy_list))
