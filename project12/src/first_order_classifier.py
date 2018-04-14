@@ -1,25 +1,16 @@
-import sys
 import os  # for file separator (in linux & windows)
-import math
-
+import math # log calculations
+from collections import OrderedDict # for confusion matrix
+from utils import *
 import numpy as np
 
-from utils import *
 
-tagged = sys.argv[1]  # 1 - majority, 2 - bi-gram
-fileName = sys.argv[2]  # 1 - majority, 2 - bi-gram
-model = sys.argv[3]
-smoothing = sys.argv[4]
-
-# file paths
-lexical_file_path = 'lexical-model.txt'  # train phase output
-structural_file_path = 'structural-model.txt'  # train phase output
-train_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos.train'
 
 test_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos.test'
 gold_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos.gold'
 class_output_path = 'classifications-bigram.tagged'  # decode phase output
 evaluate_file_path = 'evaluation-bigram.eval'  # evaluate phase output
+DO_NOT_USE_NNP = True
 
 
 def get_probability(word_tag_counter, tag_counter):
@@ -121,7 +112,7 @@ def build_probability_map(gram_counters):
     return all_prob_map
 
 
-def train_first_order_classifier(train_file_path, lexical_file_path, structural_file_path, order):
+def train_first_order_classifier(train_file_path, lexical_file_path, structural_file_path, order, smoothing):
     # analyze data
     tags_counters_map = dict()
     words_tags_counters_map = build_segment_tags_map(train_file_path, tags_counters_map)
@@ -175,6 +166,15 @@ def load_possible_tags(structural_file_path):
     return all_tags
 
 
+def init_conf_matrix(all_tags_list):
+    matrix = OrderedDict()
+    for tag in  all_tags_list:
+        matrix[tag] = OrderedDict()
+        for other_tag in all_tags_list:
+            matrix[tag][other_tag] = 0
+    return matrix
+
+
 # def get_all_possible_tags(structural_file_path):
 #     structural_map = load_struc_params(structural_file_path)
 
@@ -194,14 +194,13 @@ def get_emission_prob(lex_map, word, state, smoothing):
     if lex_map.has_key(word):
         pwt = float(lex_map[word].get(state, smoothing)) # smoothing
     else:
-        pwt = 0
+        pwt = SMOOTHING_FACTOR
     return pwt
 
 
 def get_log_prob(prev_state, state, word, lex_map, structural_map):
-    smoothing = math.log(0.0000001)
-    ptt = get_trans_prob(prev_state, state, structural_map, smoothing)
-    pwt = get_emission_prob(lex_map, word, state, smoothing)
+    ptt = get_trans_prob(prev_state, state, structural_map, SMOOTHING_FACTOR)
+    pwt = get_emission_prob(lex_map, word, state, SMOOTHING_FACTOR)
     return 1.0 * (ptt + pwt)
 
 
@@ -210,7 +209,8 @@ def get_max(states, viterbi_prob_matrix, state, prev_word_index, word, lex_map, 
     max_state_tag = ""
     max_state_pointer = 0
     for index_tag, s_tag in enumerate(states):
-        tmp = viterbi_prob_matrix[prev_word_index, index_tag] + get_log_prob(s_tag, state, word, lex_map, strc_map)
+        calculated_prob = get_log_prob(s_tag, state, word, lex_map, strc_map)
+        tmp = viterbi_prob_matrix[prev_word_index, index_tag] + calculated_prob
         if tmp > max_state_log_prob:
             max_state_log_prob = tmp
             max_state_tag = s_tag
@@ -223,7 +223,7 @@ def get_termination_step_max(viterbi_prob_matrix, last_word_index, strc_map, sta
     max_state_tag = ""
     max_state_pointer = 0
     for state_index, last_state_prob in enumerate(viterbi_prob_matrix[last_word_index, :]):
-        tmp = viterbi_prob_matrix[last_word_index, state_index] + get_trans_prob(states[state_index], END_TAG, strc_map, smoothing)
+        tmp = viterbi_prob_matrix[last_word_index, state_index] + get_trans_prob(states[state_index], END_TAG, strc_map, SMOOTHING_FACTOR)
         if tmp > max_state_log_prob:
             max_state_log_prob = tmp
             max_state_tag = states[state_index]
@@ -231,7 +231,7 @@ def get_termination_step_max(viterbi_prob_matrix, last_word_index, strc_map, sta
     return max_state_tag, max_state_pointer
 
 
-def sentence_decoder(sentence, trained_model, states, markers_count):
+def sentence_decoder(sentence, trained_model, states, markers_count, nnp_index):
     structural_map, lex_map = trained_model
     all_states = len(states)  # + 2
     s_words = len(sentence)
@@ -248,12 +248,17 @@ def sentence_decoder(sentence, trained_model, states, markers_count):
         viterbi_pointer_matrix[0, index] = -1  # not needed
     if len(sentence) > 1:
         for i_word, word in enumerate(sentence[1:], start=1):
-            for i_state, state in enumerate(states):
-                max_tag_str, max_tag_prob, max_tag_pointer = get_max(states, viterbi_prob_matrix, state, i_word - 1, word.strip(), lex_map, structural_map)
-                viterbi_prob_matrix[i_word, i_state] = max_tag_prob
-                viterbi_path_matrix[i_word, i_state] = max_tag_str
-                viterbi_pointer_matrix[i_word, i_state] = max_tag_pointer
-
+            if lex_map.has_key(word.strip()) or DO_NOT_USE_NNP: # KNOWN WORD
+                for i_state, state in enumerate(states):
+                    max_tag_str, max_tag_prob, max_tag_pointer = get_max(states, viterbi_prob_matrix, state, i_word - 1, word.strip(), lex_map, structural_map)
+                    viterbi_prob_matrix[i_word, i_state] = max_tag_prob
+                    viterbi_path_matrix[i_word, i_state] = max_tag_str
+                    viterbi_pointer_matrix[i_word, i_state] = max_tag_pointer
+            else:  # UNKNOWN WORD (Tag as NNP)
+                for i_state, state in enumerate(states):
+                    viterbi_prob_matrix[i_word, i_state] = math.log(1.0)
+                    viterbi_path_matrix[i_word, i_state] = NNP_STATE
+                    viterbi_pointer_matrix[i_word, i_state] = nnp_index
     last_tag_str, next_state_pointer = get_termination_step_max(viterbi_prob_matrix, i_word, structural_map, states)
     # back trace
     best_path[s_words - 1] = last_tag_str
@@ -263,7 +268,24 @@ def sentence_decoder(sentence, trained_model, states, markers_count):
     return best_path
 
 
+def get_nnp_state_index(possible_tags):
+    for index, state in enumerate(possible_tags):
+        if state == NNP_STATE:
+            return index
+
+
+def get_sorted_errors(conf_matrix):
+    all_errors = []
+    for tag in conf_matrix.keys():
+        for secondary_tag in conf_matrix[tag].keys():
+            if tag != secondary_tag:
+                all_errors.append((tag, secondary_tag, conf_matrix[tag][secondary_tag]))
+    sorted_errors = sorted(all_errors, key=lambda x: x[2], reverse=True)
+    return sorted_errors
+
+
 def decode(test_file, trained_model, possible_tags, classification_path):
+    nnp_state_index = get_nnp_state_index(possible_tags)
     n_grams = 2
     markers_count = ((n_grams - 1) * 2)
     with open(classification_path, "w") as classification_file:
@@ -280,12 +302,14 @@ def decode(test_file, trained_model, possible_tags, classification_path):
             else:
                 sentence = get_next_sentence(i, test_lines)
                 i += len(sentence)
-                tagged_sentence = sentence_decoder(sentence, trained_model, possible_tags, markers_count)
+                tagged_sentence = sentence_decoder(sentence, trained_model, possible_tags, markers_count, nnp_state_index)
                 append_sentence_to_classification_file(classification_file, sentence, tagged_sentence)
     print ""
 
 
 # run all phases one after another
-#train_first_order_classifier(train_file_path, lexical_file_path, structural_file_path, 2)
-decode(test_file_path, get_trained_model(structural_file_path, lexical_file_path), load_possible_tags(structural_file_path), class_output_path)
-evaluate(class_output_path, gold_file_path, evaluate_file_path, test_file_path, 2, smoothing)
+# train_first_order_classifier(train_file_path, lexical_file_path, structural_file_path, 2)
+# possible_tags = load_possible_tags(structural_file_path)
+# conf_matrix = init_conf_matrix(possible_tags)
+# decode(test_file_path, get_trained_model(structural_file_path, lexical_file_path), possible_tags, class_output_path)
+# conf_matrix = evaluate(class_output_path, gold_file_path, evaluate_file_path, test_file_path, conf_matrix, 2, smoothing)

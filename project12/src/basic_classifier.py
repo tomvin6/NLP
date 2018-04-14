@@ -2,18 +2,12 @@ import sys
 import os  # for file separator (in linux & windows)
 import json  # for writing the parameter file
 from utils import *
-
-tagged = sys.argv[1]  # 1 - majority, 2 - bi-gram
-fileName = sys.argv[2]  # 1 - majority, 2 - bi-gram
-model = sys.argv[3]
-smoothing = sys.argv[4]
+from constants import *
 
 # file paths
-param_file_path = 'train-param-file.txt'  # train phase output
-train_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos.train'
+
 test_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos.test'
 gold_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos.gold'
-classification_output_file_path = 'classifications.tagged'  # decode phase output
 evaluate_file_path = 'evaluation.eval'  # evaluate phase output
 
 
@@ -40,15 +34,36 @@ def train_phase(train_file_path, param_file_path_output):
 
 
 def classify_basic(segment, trained_model):
-    return trained_model.get(segment, "NNP")
+    return trained_model.get(segment, NNP_STATE)
 
 
-def get_trained_model(param_path):
+def get_trained_model_file(param_path):
     with open(param_path, "r") as model_output:
         return json.loads(model_output.read())
 
 
-# run all phases one after another
-train_phase(train_file_path, param_file_path)
-classify_phase(get_trained_model, param_file_path, test_file_path, classification_output_file_path, classify_basic)
-evaluate(classification_output_file_path, gold_file_path, evaluate_file_path, test_file_path, model, smoothing)
+def classify_phase(get_trained_model, parameters, test_path, classification_path, classifier=classify_basic):
+    classifications = []
+    # get trained model from parameters file
+    trained_model = get_trained_model(parameters)
+    # get test file data
+    with open(test_path, "r") as test_data:
+        test_lines = test_data.readlines()
+    for line in test_lines:
+        if is_comment_line(line):
+            continue
+        if not end_of_sentence(line):
+            segment = line.strip('\n')
+            classifications.append((segment, classifier(segment, trained_model)))
+        else:
+            classifications.append(line)  # for saving the spaces between sentences in classification file
+    # write classifications to file
+    with open(classification_path, "w") as classification_file:
+        for item in classifications:
+            if is_comment_line(line):
+                continue
+            if not end_of_sentence(item):
+                (segment, classification) = item
+                classification_file.write(segment + '\t' + classification + '\n')
+            else:
+                classification_file.write(item)

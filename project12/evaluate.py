@@ -1,40 +1,23 @@
-import sys
-import re  # for splitting by tabs
-import os  # for file separator (in linux & windows)
+from src.first_order_classifier import *
+from src.basic_classifier import *
+from src.constants import *
 
-tagged = sys.argv[1]  # 1 - majority, 2 - bi-gram
-fileName = sys.argv[2]  # 1 - majority, 2 - bi-gram
-model = sys.argv[3]
+# TODO: GET PATHS FROM COMMAND LINE OR USE DEFAULT
+tagged_file = sys.argv[1]
+gold_file_path = sys.argv[2]
+model = int(sys.argv[3])
 smoothing = sys.argv[4]
 
-# get file as object
-gold_file = open('exps' + os.sep + fileName)
-train_file = open('exps' + os.sep + 'heb-pos.train')
+# assign default values
+if model != 1:
+    model = 2
+if str(smoothing).lower() == "t" or str(smoothing).lower() == "yes":
+    smoothing = True
+
+if model == 1:
+    evaluate(classification_output_file_path, gold_file_path, evaluate_file_path, test_file_path, model, smoothing)
+else:
+    conf_matrix = evaluate(class_output_path, gold_file_path, evaluate_file_path, test_file_path, 2, smoothing)
 
 
-def count_words():
-    uni_count = 0
-    segment_words = set()
-    segment_tags = set()
-    train_lines = train_file.readlines()
-    gold_lines = gold_file.readlines()
-    # count train file
-    for line in train_lines:
-        uni_count += 1
-        if len(line.strip()) > 0 and not line.startswith("#"):
-            tokens = re.split(r'\t+', line)
-            segment_words.add(tokens[0])
-            segment_tags.add(tokens[1])
-    # count gold file
-    for line in gold_lines:
-        uni_count += 1
-        if len(line.strip()) > 0 and not line.startswith("#"):
-            tokens = re.split(r'\t+', line)
-            segment_words.add(tokens[0])
-            segment_tags.add(tokens[1])
-    print "word type count = " + str(len(segment_words))
-    print "word count = " + str(uni_count)
-    print "tag count = " + str(len(segment_tags))
 
-
-count_words()

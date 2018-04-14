@@ -1,11 +1,15 @@
 import re  # for splitting by tabs
 from itertools import izip
+import math
 
+import sys
 # constants
 MISSING = object()
 START_TAG = "<s>"
 END_TAG = "<e>"
-
+MAX_NEGATIVE = -sys.maxint - 1
+NNP_STATE = "NNP"
+SMOOTHING_FACTOR = math.log(0.0000001)#-sys.maxint - 1 #
 
 def is_line_legal(line):
     return len(line.strip()) > 0 and not line.startswith("#") and len(re.split(r'\t+', line)) == 2
@@ -143,7 +147,7 @@ def build_segment_tags_map(train_file_path, tags_map=MISSING):
 
 def append_sentence_to_classification_file(classification_file, sentence_words, sentence_class):
         for i, word in enumerate(sentence_words):
-            classification_file.write(sentence_words[i].strip() + '\t' + sentence_class[i].strip() + '\n')
+            classification_file.write(str(sentence_words[i]).strip() + '\t' + str(sentence_class[i]).strip() + '\n')
 
 
 def word_accuracy_for_sentence(sentence_matches, sentence_length):
@@ -154,33 +158,6 @@ def sentence_accuracy_for_sentence(sentence_matches, sentence_length):
     if word_accuracy_for_sentence(sentence_matches, sentence_length) >= 1.0:
         return 1
     return 0
-
-
-def classify_phase(get_trained_model, parameters, test_path, classification_path, classifier):
-    classifications = []
-    # get trained model from parameters file
-    trained_model = get_trained_model(parameters)
-    # get test file data
-    with open(test_path, "r") as test_data:
-        test_lines = test_data.readlines()
-    for line in test_lines:
-        if is_comment_line(line):
-            continue
-        if not end_of_sentence(line):
-            segment = line.strip('\n')
-            classifications.append((segment, classifier(segment, trained_model)))
-        else:
-            classifications.append(line)  # for saving the spaces between sentences in classification file
-    # write classifications to file
-    with open(classification_path, "w") as classification_file:
-        for item in classifications:
-            if is_comment_line(line):
-                continue
-            if not end_of_sentence(item):
-                (segment, classification) = item
-                classification_file.write(segment + '\t' + classification + '\n')
-            else:
-                classification_file.write(item)
 
 
 # this method takes a sentence details and update output list with new values
@@ -195,7 +172,16 @@ def sentence_accuracy_for_test_corpus(sentences_accuracy_list):
     return 1.0 * perfect_sentences / len(sentences_accuracy_list)
 
 
-def evaluate(classification_output_path, gold_path, evaluate_file_path, test_file_path, model, smoothing):
+def add_to_conf_matrix(conf_matrix, real_tag, prediction):
+    if conf_matrix != MISSING:
+        if conf_matrix.has_key(real_tag):
+            conf_matrix[real_tag][prediction] += 1
+        else:
+            conf_matrix[real_tag] = dict()
+            conf_matrix[real_tag][prediction] = 1
+
+
+def evaluate(classification_output_path, gold_path, evaluate_file_path, test_file_path, model, smoothing, conf_matrix=MISSING):
     sentences_accuracy_list = []
     sentence_index = 0
     last_sentence_length = 0
@@ -221,6 +207,7 @@ def evaluate(classification_output_path, gold_path, evaluate_file_path, test_fil
                 last_sentence_matches += 1
             else:
                 errors += 1
+            add_to_conf_matrix(conf_matrix, real_tag, prediction)
             all_data += 1
             last_sentence_length += 1
     # last sentence can finish without EOL character
@@ -233,3 +220,4 @@ def evaluate(classification_output_path, gold_path, evaluate_file_path, test_fil
         print_title_to_file(eval_file, "sent-num word-accuracy sent-accuracy")
         print_sentence_data(eval_file, sentences_accuracy_list)
         print_macro_avg(eval_file, 1.0 * matches / all_data, sentence_accuracy_for_test_corpus(sentences_accuracy_list))
+    return conf_matrix
