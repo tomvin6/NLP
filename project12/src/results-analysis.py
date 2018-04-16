@@ -29,14 +29,13 @@ def generate_x_lines_file(orig_file_path, output_file_path, percent_to_read):
 
 # dividing the train to 10 parts experiment, measure accuracy:
 tmp_train_file = '..' + os.sep + 'tmp' + os.sep + 'partial-train.txt'
-default_train_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos.train'
 
 for i in range(1, 11):
     generate_x_lines_file(default_train_file_path, tmp_train_file, i * 0.10)
-    train_first_order_classifier(tmp_train_file, lexical_file_path, structural_file_path, 2, True)
-    possible_tags = load_possible_tags(structural_file_path)
+    train_first_order_classifier(tmp_train_file, default_lexical_file_path, default_structural_file_path, 2, True)
+    possible_tags = load_possible_tags(default_structural_file_path)
     conf_matrix = init_conf_matrix(possible_tags)
-    decode(test_file_path, get_trained_model(structural_file_path, lexical_file_path), possible_tags, class_output_path)
+    decode(test_file_path, get_trained_model(default_structural_file_path, default_lexical_file_path), possible_tags, class_output_path)
     conf_matrix = evaluate(class_output_path, gold_file_path, evaluate_file_path + str(i), test_file_path, 2, True, conf_matrix)
     sorted_errors = get_sorted_errors(conf_matrix)
     print "generated output " + str(i)

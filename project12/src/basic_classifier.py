@@ -2,13 +2,6 @@ import sys
 import os  # for file separator (in linux & windows)
 import json  # for writing the parameter file
 from utils import *
-from constants import *
-
-# file paths
-
-test_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos.test'
-gold_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos.gold'
-evaluate_file_path = 'evaluation.eval'  # evaluate phase output
 
 
 # this method implements majority classifier

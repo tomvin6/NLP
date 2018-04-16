@@ -4,12 +4,6 @@ from collections import OrderedDict # for confusion matrix
 from utils import *
 import numpy as np
 
-
-
-test_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos.test'
-gold_file_path = '..' + os.sep + 'exps' + os.sep + 'heb-pos.gold'
-class_output_path = 'classifications-bigram.tagged'  # decode phase output
-evaluate_file_path = 'evaluation-bigram.eval'  # evaluate phase output
 DO_NOT_USE_NNP = True
 
 

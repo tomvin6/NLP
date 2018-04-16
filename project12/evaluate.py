@@ -15,9 +15,9 @@ if str(smoothing).lower() == "t" or str(smoothing).lower() == "yes":
     smoothing = True
 
 if model == 1:
-    evaluate(classification_output_file_path, gold_file_path, evaluate_file_path, test_file_path, model, smoothing)
+    evaluate(classification_output_file_path, gold_file_path, evaluate_file_path, "heb-pos.test", model, smoothing)
 else:
-    conf_matrix = evaluate(class_output_path, gold_file_path, evaluate_file_path, test_file_path, 2, smoothing)
+    conf_matrix = evaluate(class_output_path, gold_file_path, evaluate_file_path, "heb-pos.test", 2, smoothing)
 
 
 

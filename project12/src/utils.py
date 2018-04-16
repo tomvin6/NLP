@@ -9,7 +9,8 @@ START_TAG = "<s>"
 END_TAG = "<e>"
 MAX_NEGATIVE = -sys.maxint - 1
 NNP_STATE = "NNP"
-SMOOTHING_FACTOR = math.log(0.0000001)#-sys.maxint - 1 #
+SMOOTHING_FACTOR = math.log(0.0000001)
+
 
 def is_line_legal(line):
     return len(line.strip()) > 0 and not line.startswith("#") and len(re.split(r'\t+', line)) == 2
@@ -125,6 +126,7 @@ def update_words_tag_model(words_tag_dict, word_segment, word_tag):
 # each segment type a map of all POS tags with counter for
 # each one of them: SEG -> {t1:3, t2:4, t7: 15}
 def build_segment_tags_map(train_file_path, tags_map=MISSING):
+    print "train on file: " + train_file_path
     uni_count = 0
     words_tag_model_tmp_data = dict()
     # read data from train file
